@@ -24,7 +24,7 @@ pip install -r requirements.txt
 pip install requests selenium colorama tabulate argparse requests
 
 Usage 
-python3 security_headers_check.py -URL compare-me.dgleb.com   
-python3 security_headers_check.py --IAP -URL compare-me.dgleb.com   #For IAP protected webapps or any webapp behind a login page
+python3 security_headers_check.py -URL example.com   
+python3 security_headers_check.py --IAP -URL example.com   #For IAP protected webapps or any webapp behind a login page
 
 

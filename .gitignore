@@ -3,9 +3,13 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+
+# Chrome
+*.log
 # C extensions
 *.so
-
+.cookies.pkl
+*.pkl
 # Distribution / packaging
 .Python
 build/

@@ -1,32 +1,43 @@
-import requests
-from colorama import Fore, Style,Back, init
-from tabulate import tabulate
+from colorama import Fore, Style,Back, init 
+from tabulate import tabulate 
 from selenium import webdriver
-import textwrap
-import argparse
+from datetime import datetime, timedelta
+import textwrap,pickle,os,argparse,requests
 
 redirect_attempts = 0
 max_redirects = 5
-active_headers =0
 session = requests.Session()
 
 # argument parser
 parser = argparse.ArgumentParser(description="Security Headers Checker")
 
 parser.add_argument(
-    "-URL",
+    "-u",
+    "--url",
     action="store",
     dest="url",
-    required=True,
     help="The website URL to check (e.g., example.com).",
 )
 
 parser.add_argument(
-    "-IAP",
+    "-p",
+    "--protected",
     action="store_true",  # Boolean flag (True/False)
-    help="Enable authentication for IAP-protected websites.",
+    help="Enable authentication for protected websites.",
 )
 
+parser.add_argument(
+    "-d",
+    "--disable-ssl",
+    action="store_true",
+    help="Skip SSL certificate verification (use with caution).",
+)
+
+parser.add_argument(
+    "--clear-cookies",
+    action="store_true",
+    help="Clear saved cookies"
+)
 
 # List of common security headers -
 security_headers = [
@@ -55,28 +66,79 @@ security_headers = [
     "xf-custom_header", #any custom header needed
 ]
 
+def clear_cookies():
+    """Securely clear saved cookies"""
+    cookie_file = '.cookies.pkl'
+    if os.path.exists(cookie_file):
+        os.remove(cookie_file)
+        print(f"{Fore.GREEN}Cookies cleared{Style.RESET_ALL}")
 
 def get_session():
-    if args.IAP:
-        print(f"{Fore.YELLOW}Launching browser for IAP authentication...{Style.RESET_ALL}")
+    session = requests.Session()
+    cookie_file = '.cookies.pkl'
+    
+    if args.protected:
+        if os.path.exists(cookie_file):
+            try:
+                with open(cookie_file, 'rb') as f:
+                    cookie_data = pickle.load(f)
+                    expiry = cookie_data.get('expiry', datetime.now())
+                    
+                if datetime.now() < expiry:
+                    for cookie in cookie_data['cookies']:
+                        session.cookies.set(
+                            name=cookie.get('name'),
+                            value=cookie.get('value'),
+                            domain=cookie.get('domain')
+                        )
+                    print(f"{Fore.GREEN}Using saved cookies{Style.RESET_ALL}")
+                    return session
+                else:
+                    print(f"{Fore.YELLOW}Saved cookies expired{Style.RESET_ALL}")
+            except Exception as e:
+                print(f"{Fore.YELLOW}Error loading cookies: {e}{Style.RESET_ALL}")
+        
+        print(f"{Fore.YELLOW}Launching browser for authentication...{Style.RESET_ALL}")
         try:
             browser = webdriver.Chrome()
             browser.get(url)
-            input("Press Enter after logging in and wait for redirection to complete")
-            cookies = browser.get_cookies()
-            for cookie in cookies:
-                session.cookies.set(cookie["name"], cookie["value"])
+            input("Press Enter after logging in...")
+            
+            browser_cookies = browser.get_cookies()
+            cookie_data = {
+                'cookies': browser_cookies,
+                'expiry': datetime.now() + timedelta(hours=24)
+            }
+            
+            # Set cookies in session
+            for cookie in browser_cookies:
+                session.cookies.set(
+                    name=cookie.get('name'),
+                    value=cookie.get('value'),
+                    domain=cookie.get('domain')
+                )
+            
+            # Save cookies to file
+            with open(cookie_file, 'wb') as f:
+                pickle.dump(cookie_data, f)
+            
+            print(f"{Fore.GREEN}Cookies saved for future use{Style.RESET_ALL}")
             browser.quit()
+            
         except Exception as e:
             print(f"{Fore.RED}Error with WebDriver: {e}{Style.RESET_ALL}")
+            if browser:
+                browser.quit()
             exit(1)
     else:
         print(f"{Fore.YELLOW}No authentication enabled{Style.RESET_ALL}")
+    
     return session
 
 
 def check_security_headers(url, session):
     redirect_attempts = 0
+    active_headers = 0
     # Send a request to the URL
     try:
         response = session.get(url,timeout=10)
@@ -88,7 +150,7 @@ def check_security_headers(url, session):
         print(f"Error fetching URL: {e}")
         return
     while (
-        args.IAP
+        args.protected
         and response.url.rstrip("/") != url
         and redirect_attempts < max_redirects
     ):
@@ -108,11 +170,7 @@ def check_security_headers(url, session):
         # Check and display security headers
 
         for header in security_headers:
-            global active_headers
-            active_headers = 0
-             # Number of active headers
-            if header in headers:
-             
+            if header in headers:   
                 result = f"{Fore.GREEN}Present{Style.RESET_ALL}"
                 value = headers[header]
                 active_headers +=1
@@ -137,9 +195,17 @@ def check_security_headers(url, session):
 
 if __name__ == "__main__":
     args = parser.parse_args()
+    if args.clear_cookies:
+        print(f"{Fore.YELLOW}Clearing cookies{Style.RESET_ALL}")
+        clear_cookies()
+        if not args.url:
+            exit(0)
+    if not args.url:
+        exit(0)
     if args.url.startswith("http://") or args.url.startswith("https://"):
         url = args.url
     else:
         url = f"https://{args.url}"
+
 
     check_security_headers(url, get_session())

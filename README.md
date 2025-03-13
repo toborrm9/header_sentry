@@ -42,6 +42,6 @@ python HeaderSentry.py --clear-cookies
 ```
 
 ## Security Note
-- `.cookies.pkl` contains sensitive data and is git-ignored
+- `.cookies.pkl` contains sensitive data
 - First visit opens Chrome for authentication
 - Subsequent visits use stored cookies

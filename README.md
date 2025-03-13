@@ -9,7 +9,6 @@ A Python script that checks **security headers** for websites, including **Googl
 - Check security headers of any website
 - Support for protected sites requiring authentication
 - Cookie storage for faster subsequent checks
-- Color-coded results for better readability
 - SSL verification control
 
 ---
